@@ -1,0 +1,53 @@
+{
+  "name": "@stackql/provider-doc-util",
+  "version": "1.0.0",
+  "description": "Command line utility to prepare StackQL provider interface documents",
+  "main": "src/index.js",
+  "bin": {
+    "provider-doc-util": "bin/provider-doc-util"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "stackql",
+    "provider-doc-util",
+    "openapi"
+  ],
+  "author": "Jeffrey Aven",
+  "license": "MIT",
+  "dependencies": {
+    "@readme/openapi-parser": "^2.0.4",
+    "arg": "^4.1.0",
+    "chalk": "^2.4.2",
+    "covgen": "^3.1.0",
+    "esm": "^3.2.18",
+    "execa": "^1.0.0",
+    "gitignore": "^0.6.0",
+    "inquirer": "^6.2.2",
+    "js-hcl-parser": "^1.0.1",
+    "js-yaml": "4.1.0",
+    "jsonpath": "^1.1.1",
+    "listr": "^0.14.3",
+    "ncp": "^2.0.0",
+    "pkg-install": "^0.2.0",
+    "spdx-license-list": "^5.0.0",
+    "toml-js": "0.0.8"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stackql/provider-doc-util.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stackql/provider-doc-util/issues"
+  },
+  "homepage": "https://github.com/stackql/provider-doc-util#readme"
+}
