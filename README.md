@@ -33,8 +33,48 @@ from the package directory, run:
 npm link
 ```
 
-## Command Line Usage
+## Usage
 
+```bash
+provider-doc-util <command> <apiDoc or providerDevDocRoot> <stackqlProviderName> [<stackqlProviderVersion>] [<OPTIONS>]
+```
+
+### Commands
+
+__`dev`__  
+
+Creates StackQL provider development docs and splits an API into service scoped documents based upon a specified discriminator (optional).  Development docs will parse a providers API and map default routes for StackQL query and DML operations, these can be modified or enriched by the developer.  For convinience, development docs can be generated in `json`, `yaml`, `toml` or `hcl` formats.  The development docs are then assembled using the __build__ command and then can be tested locally see [Test Using a Local Registry](#test-using-a-local-registry).  Once you have tested locally you can raise a pull request to [stackql/stackql-provider-registry](https://github.com/stackql/stackql-provider-registry).    
+
+__`build`__  
+
+Assembles StackQL development docs into a registry compatible format, ready to use as a local registry for testing or to raise a pull request to [stackql/stackql-provider-registry](https://github.com/stackql/stackql-provider-registry).  
+
+
+### Options
+
+__`--svcDiscriminator`, `-s`__  *JSONPath expression* OR *svcName:servicename*
+
+blah  
+
+__`--resDiscriminator`, `-r`__  *JSONPath expression*  
+
+blah
+
+__`--methodkey`, `-m`__  *JSONPath expression*  
+
+blah
+
+__`--output`, `-o`__  *directory*  
+
+blah
+
+__`--format`, `-f`__  *yaml | json | toml | hcl*  
+
+blah
+
+__`--debug`, `-d`__  
+
+blah
 
 
 ## Example
@@ -110,7 +150,7 @@ v1 `
 -o ./src
 ```
 
-### Test Locally
+### Test Using a Local Registry
 
 ```
 cd local-registry
