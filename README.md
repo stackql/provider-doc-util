@@ -40,7 +40,7 @@ npm link
 <p>
 The StackQL utility provides a SQL interface to cloud and SaaS providers, mapping a provider to an ORM, transpiling input SQL to provider API requests, and bringing back response data as a SQL based result set.  StackQL is capable of DML operations such as `INSERT` and `DELETE` which can be used to provision or de-provision cloud resources, query operations using `SELECT` to collect, analyze, report on asset or configuration data, and lifecycle operations such as starting a VM instance using the `EXEC` command in StackQL.  
 
-The StackQL ORM provides a logical model to work with cloud resources similar to the way databases are organized into schemas.  This object/resource heirarchy is summarized below:  
+The StackQL ORM provides a logical model to work with cloud resources similar to the way databases are organized into schemas.  This object/resource hierarchy is summarized below:  
 
 ```
 provider/
@@ -92,14 +92,14 @@ StackQL provider interfaces (such as GCP, Okta, GitHub, AWS, Azure, etc) are def
 ## Usage
 
 ```bash
-provider-doc-util <command> <apiDoc or providerDevDocRoot> <stackqlProviderName> [<stackqlProviderVersion>] [<OPTIONS>]
+provider-doc-util <command> <apiDoc or providerDevDocRoot> <stackqlProviderName> <stackqlProviderVersion> [<OPTIONS>]
 ```
 
 ### Commands
 
 __`dev`__  
 
-Creates StackQL provider development docs and splits an API into service scoped documents based upon a specified discriminator (optional).  Development docs will parse a providers API and map default routes for StackQL query and DML operations, these can be modified or enriched by the developer.  For convinience, development docs can be generated in `json`, `yaml`, `toml` or `hcl` formats.  The development docs are then assembled using the __build__ command and then can be tested locally see [Test Using a Local Registry](#test-using-a-local-registry).  Once you have tested locally you can raise a pull request to [stackql/stackql-provider-registry](https://github.com/stackql/stackql-provider-registry).    
+Creates StackQL provider development docs and splits an API into service scoped documents based upon a specified discriminator (optional).  Development docs will parse a providers API and map default routes for StackQL query and DML operations, these can be modified or enriched by the developer.  For convenience, development docs can be generated in `json`, `yaml`, `toml` or `hcl` formats.  The development docs are then assembled using the __build__ command and then can be tested locally see [Test Using a Local Registry](#test-using-a-local-registry).  Once you have tested locally you can raise a pull request to [stackql/stackql-provider-registry](https://github.com/stackql/stackql-provider-registry).    
 
 __`build`__  
 
@@ -110,7 +110,7 @@ Assembles StackQL development docs into a registry compatible format, ready to u
 
 __`--svcDiscriminator`, `-s`__  *JSONPath expression* OR *svcName:servicename*
 
-The __*service discriminator*__ option is used to determine how to split a large provider document into smalled, service scoped documents.  The option is required for the __`dev`__ command and ignored otherwise.  If you do not wish to spilt the provider API spec, sepcific svcName:*servicename* for this option which will define one service in the StackQL provider with the name provided in *servicename*.  
+The __*service discriminator*__ option is used to determine how to split a large provider document into smaller, service scoped documents.  The option is required for the __`dev`__ command and ignored otherwise.  If you do not wish to spilt the provider API spec, specify `svcName:<servicename>` for this option which will define one service in the StackQL provider with the name provided in *servicename*.  
 
 > Example: `-s "$['x-github'].category"` would split the given provider API spec into service documents by matching the `x-github.category` value in each unique operation (combination of a path and an HTTP method) in API doc.
 
@@ -122,7 +122,7 @@ The __*resource discriminator*__ option is used to determine how to identify Sta
 
 __`--methodkey`, `-m`__  *JSONPath expression*  
 
-The __*method key*__ option determines uniquely named operations which are mapped to SQL methods in the StackQL ORM.  These methods are then mapped to default routes (SQL query and DML methods) in StackQL, the developer can override or update thes mappings in the development docs which are outputed from the __`dev`__  command.
+The __*method key*__ option determines uniquely named operations which are mapped to SQL methods in the StackQL ORM.  These methods are then mapped to default routes (SQL query and DML methods) in StackQL, the developer can override or update these mappings in the development docs which are outputted from the __`dev`__  command.
 
 > If supplied it must be a JSONPath expression relative to the operation (http path and verb), if not supplied it will default to `operationId` in the OpenAPI specification for each operation.  
 
@@ -134,7 +134,7 @@ The __*output directory*__ option specifies where to write out the development d
 
 __`--format`, `-f`__  *yaml | json | toml | hcl*  
 
-The __*output format*__ option specifies the desired output for the development docs - the annotations/extensions required for StackQL which the developer can modify or enrich.  For convinence multiple serialization formats are available including `yaml`, `json`, `toml` and `hcl` (the HashiCorp Configuration Language).  
+The __*output format*__ option specifies the desired output for the development docs - the annotations/extensions required for StackQL which the developer can modify or enrich.  For convenience multiple serialization formats are available including `yaml`, `json`, `toml` and `hcl` (the HashiCorp Configuration Language).  
 
 __`--debug`, `-d`__  
 
@@ -185,38 +185,62 @@ The `src` directory contains the output of the StackQL provider interface genera
 
 PowerShell:  
 
-```powershell
+```PowerShell
+cd local-registry
 provider-doc-util dev `
-ref/github/api.github.com.yaml `
+.\ref\github\api.github.com.yaml `
 github `
 v1 `
 -s "$['x-github'].category" `
 -r "$['x-github'].subcategory" `
--o ./dev `
+-o .\dev `
 -f toml
 ```
 
-#### linux
-`provider-doc-util api.github.com.yaml github v1 -s '$["x-github"].category' -r '$["x-github"].subcategory'`
+Bash:  
 
+```bash
+cd local-registry
+provider-doc-util dev \
+ref/github/api.github.com.yaml \
+github \
+v1 \
+-s '$["x-github"].category' \
+-r '$["x-github"].subcategory' \
+-o ./dev \
+-f toml
+```
 
 ### Build Provider Docs
 
 
 PowerShell:  
 
-```powershell
+```PowerShell
+cd local-registry
 provider-doc-util `
 build `
-./dev `
+.\dev `
 github `
 v1 `
+-o .\src
+```
+
+Bash:  
+
+```bash
+cd local-registry
+provider-doc-util \
+build \
+./dev \
+github \
+v1 \
 -o ./src
 ```
 
 ### Test Using a Local Registry
 
-```
+```bash
 cd local-registry
 PROVIDER_REGISTRY_ROOT_DIR="$(pwd)"
 REG_STR='{"url": "file://'${PROVIDER_REGISTRY_ROOT_DIR}'", "localDocRoot": "'${PROVIDER_REGISTRY_ROOT_DIR}'", "verifyConfig": {"nopVerify": true}}'
