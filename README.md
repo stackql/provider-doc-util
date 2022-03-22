@@ -33,6 +33,62 @@ from the package directory, run:
 npm link
 ```
 
+## Background
+
+<details>
+<summary>Read this section for background on the StackQL product</summary>
+<p>
+The StackQL utility provides a SQL interface to cloud and SaaS providers, mapping a provider to an ORM, transpiling input SQL to provider API requests, and bringing back response data as a SQL based result set.  StackQL is capable of DML operations such as `INSERT` and `DELETE` which can be used to provision or de-provision cloud resources, query operations using `SELECT` to collect, analyze, report on asset or configuration data, and lifecycle operations such as starting a VM instance using the `EXEC` command in StackQL.  
+
+The StackQL ORM provides a logical model to work with cloud resources similar to the way databases are organized into schemas.  This object/resource heirarchy is summarized below:  
+
+```
+provider/
+├─ service/
+│  ├─ resource/
+│  │  ├─ fields
+│  │  ├─ methods
+```
+
+an example would be:
+
+```
+google/
+├─ compute/
+│  ├─ instances/
+│  │  ├─ id, name, status, ...
+│  │  ├─ start, stop, ...
+```
+
+Enabling StackQL to interact with the `google` provider using SQL semantics, for example:
+
+Provider discovery operations such as..
+
+```sql
+SHOW RESOURCES IN google.compute;
+DESCRIBE google.compute.instances;
+```
+
+Query operations such as..  
+
+```sql
+SELECT status, COUNT(*) as num_instances 
+FROM google.compute.instances
+WHERE project = 'myproject' and zone = 'us-west-1a'
+GROUP BY status;
+```
+
+Provisioning operations such as creating a Compute Engine instance using an `INSERT` statement or deprovisioning an instance using a `DELETE` statement.  
+</p>
+</details>
+
+<details>
+<summary>Read this section for background on the StackQL Provider Registry</summary>
+<p>
+StackQL provider interfaces (such as GCP, Okta, GitHub, AWS, Azure, etc) are defined using annotations to the provider API (OpenAPI) specification, these annotations or extensions allow StackQL to map the providers resource to the desired ORM and define routes for SQL verbs such as `SELECT`, `INSERT`, `DELETE`, and `EXEC`.  
+</p>
+</details>
+
 ## Usage
 
 ```bash
@@ -54,27 +110,35 @@ Assembles StackQL development docs into a registry compatible format, ready to u
 
 __`--svcDiscriminator`, `-s`__  *JSONPath expression* OR *svcName:servicename*
 
-blah  
+The __*service discriminator*__ option is used to determine how to split a large provider document into smalled, service scoped documents.  The option is required for the __`dev`__ command and ignored otherwise.  If you do not wish to spilt the provider API spec, sepcific svcName:*servicename* for this option which will define one service in the StackQL provider with the name provided in *servicename*.  
+
+> Example: `-s "$['x-github'].category"` would split the given provider API spec into service documents by matching the `x-github.category` value in each unique operation (combination of a path and an HTTP method) in API doc.
 
 __`--resDiscriminator`, `-r`__  *JSONPath expression*  
 
-blah
+The __*resource discriminator*__ option is used to determine how to identify StackQL resources in a given provider API spec.
+
+> Example: `-r "$['x-github'].subcategory"`  would identify resources in the given provider API spec by matching the `x-github.subcategory` value in each unique operation (combination of a path and an HTTP method) in API doc.
 
 __`--methodkey`, `-m`__  *JSONPath expression*  
 
-blah
+The __*method key*__ option determines uniquely named operations which are mapped to SQL methods in the StackQL ORM.  These methods are then mapped to default routes (SQL query and DML methods) in StackQL, the developer can override or update thes mappings in the development docs which are outputed from the __`dev`__  command.
+
+> If supplied it must be a JSONPath expression relative to the operation (http path and verb), if not supplied it will default to `operationId` in the OpenAPI specification for each operation.  
 
 __`--output`, `-o`__  *directory*  
 
-blah
+The __*output directory*__ option specifies where to write out the development docs in a __`dev`__ operation or the production docs in a __`build`__ operation.  
+
+> If not supplied it will default to the current working directory
 
 __`--format`, `-f`__  *yaml | json | toml | hcl*  
 
-blah
+The __*output format*__ option specifies the desired output for the development docs - the annotations/extensions required for StackQL which the developer can modify or enrich.  For convinence multiple serialization formats are available including `yaml`, `json`, `toml` and `hcl` (the HashiCorp Configuration Language).  
 
 __`--debug`, `-d`__  
 
-blah
+__*debug flag*__ which can be set for additional print statements.  
 
 
 ## Example
