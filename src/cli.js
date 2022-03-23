@@ -85,6 +85,20 @@ function serializeData(data, format){
       };
 }
 
+function deserializeData(str, format){
+    switch(format) {
+        case 'yaml':
+            return yaml.load(str);
+        case 'hcl':
+            return JSON.parse(hcl.parse(str));
+        case 'json':
+            return JSON.parse(str);
+        default:
+            // toml
+            return toml.parse(str);
+      };
+}
+
 export async function cli(args) {
     //
     // parse command line args
@@ -143,18 +157,18 @@ export async function cli(args) {
             switch(providerDoc.split('.').pop()) {
                 case 'toml':
                     console.log("converting toml to json...");
-                    providerDocJson = toml.parse(fs.readFileSync(providerDoc, 'utf8'));
+                    providerDocJson = deserializeData(fs.readFileSync(providerDoc, 'utf8'), 'toml');
                     break;
                 case 'yaml':
                     console.log("converting yaml to json...");    
-                    providerDocJson = yaml.load(fs.readFileSync(providerDoc, 'utf8'));
+                    providerDocJson = deserializeData(fs.readFileSync(providerDoc, 'utf8'), 'yaml');
                     break;
                 case 'json':
-                    providerDocJson = JSON.parse(fs.readFileSync(providerDoc, 'utf8'));
+                    providerDocJson = deserializeData(fs.readFileSync(providerDoc, 'utf8'), 'json');
                     break;
                 case 'hcl':
                     console.log("converting hcl to json...");    
-                    providerDocJson = JSON.parse(hcl.parse(fs.readFileSync(providerDoc, 'utf8')));
+                    providerDocJson = deserializeData(fs.readFileSync(providerDoc, 'utf8'), 'hcl');
                     break;
                 default:
                     console.log(`ERROR: unknown provider doc format ${providerDoc.split('.').pop()}`);
@@ -162,16 +176,55 @@ export async function cli(args) {
             };
             // write provider doc to output dir
             const outputDir = options.outputDir;
-            const outputFile = `${outputDir}/provider.json`;
-            console.log("writing provider doc to %s...", outputFile);
-            fs.writeFileSync(outputFile, serializeData(providerDocJson, 'json'));
-
+            // make package dirs
+            const servicesOutDir = `${outputDir}/${providerName}/${providerVersion}/services`; 
+            if (!fs.existsSync(servicesOutDir)){
+                fs.mkdirSync(servicesOutDir, { recursive: true });
+            }
+            const providerOutFile = `${outputDir}/${providerName}/${providerVersion}/provider.json`;
+            console.log("writing provider doc to %s...", providerOutFile);
+            fs.writeFileSync(providerOutFile, serializeData(providerDocJson, 'json'));
             // look for services dir
+            const svcsInputDir = `${docDir}/services`;
+            if (!fs.existsSync(svcsInputDir)){
+                console.log(`ERROR: ${svcsInputDir} does not exist`);
+                return
+            };    
             // iterate through services dir
-            // for each service get toml, yaml, hcl, json doc
-            // merge with api doc
-            // write to output as json
-
+            const services = fs.readdirSync(svcsInputDir);
+            for (const service of services) {
+                let outputObj = {};
+                console.log(`processing ${service}...`);
+                // get openapi doc
+                let openapiDocFile = `${svcsInputDir}/${service}/${service}-${providerVersion}.yaml`;
+                if (!fs.existsSync(openapiDocFile)){
+                    console.log(`ERROR: ${openapiDocFile} does not exist`);
+                    return
+                };
+                let openapiData = await OpenAPIParser.parse(deserializeData(fs.readFileSync(openapiDocFile, 'utf8'), 'yaml'), {resolve: {http: false}});
+                // get stackql resource definitions
+                let svcDir = fs.readdirSync(`${svcsInputDir}/${service}`);
+                let resourcesDef = false;
+                for (const defFile of svcDir) {
+                    if (defFile.endsWith('-resources.toml')){
+                        resourcesDef = deserializeData(fs.readFileSync(`${svcsInputDir}/${service}/${defFile}`, 'utf8'), 'toml');
+                    } else if (defFile.endsWith('-resources.yaml')){
+                        resourcesDef = deserializeData(fs.readFileSync(`${svcsInputDir}/${service}/${defFile}`, 'utf8'), 'yaml');
+                    } else if (defFile.endsWith('-resources.json')){
+                        resourcesDef = deserializeData(fs.readFileSync(`${svcsInputDir}/${service}/${defFile}`, 'utf8'), 'json');
+                    } else if (defFile.endsWith('-resources.hcl')){
+                        resourcesDef = deserializeData(fs.readFileSync(`${svcsInputDir}/${service}/${defFile}`, 'utf8'), 'hcl');
+                    };
+                };
+                Object.keys(openapiData).forEach(openapiKey => {
+                    outputObj[openapiKey] = openapiData[openapiKey];
+                });
+                outputObj['components']['x-stackQL-resources'] = resourcesDef['components']['x-stackQL-resources'];
+                // write service doc to output dir
+                const outputFile = `${servicesOutDir}/${service}-${providerVersion}.json`;
+                console.log("writing service doc to %s...", outputFile);
+                fs.writeFileSync(outputFile, serializeData(outputObj, 'json'));
+            }
         };
     };
 
