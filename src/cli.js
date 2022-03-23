@@ -5,7 +5,7 @@ const yaml = require('js-yaml');
 const fs = require('fs');
 const jp = require('jsonpath');
 var hcl = require("js-hcl-parser");
-var toml = require('toml-js');
+var toml = require('@iarna/toml');
 
 function parseArgumentsIntoOptions(rawArgs) {
  const args = arg(
@@ -81,7 +81,7 @@ function serializeData(data, format){
             return JSON.stringify(data);
         default:
             // toml
-            return toml.dump(data);
+            return toml.stringify(data);
       };
 }
 
@@ -120,11 +120,51 @@ export async function cli(args) {
                 console.log(`ERROR: ${docDir} does not exist`);
                 return
             };
-            // look for toml, yaml, json provider doc
-
+            // look provider doc
+            const providerDocs = [
+                `${docDir}/provider.toml`,
+                `${docDir}/provider.yaml`,
+                `${docDir}/provider.json`,
+                `${docDir}/provider.hcl`,
+            ];
+            let providerDoc = false;
+            for (let i = 0; i < providerDocs.length; i++){
+                if (fs.existsSync(providerDocs[i])){
+                    providerDoc = providerDocs[i];
+                    break;
+                }
+            };
+            if (!providerDoc){
+                console.log(`ERROR: no provider doc found in ${docDir}`);
+                return
+            };
             // convert provider doc to json
-
+            let providerDocJson = false;
+            switch(providerDoc.split('.').pop()) {
+                case 'toml':
+                    console.log("converting toml to json...");
+                    providerDocJson = toml.parse(fs.readFileSync(providerDoc, 'utf8'));
+                    break;
+                case 'yaml':
+                    console.log("converting yaml to json...");    
+                    providerDocJson = yaml.load(fs.readFileSync(providerDoc, 'utf8'));
+                    break;
+                case 'json':
+                    providerDocJson = JSON.parse(fs.readFileSync(providerDoc, 'utf8'));
+                    break;
+                case 'hcl':
+                    console.log("converting hcl to json...");    
+                    providerDocJson = JSON.parse(hcl.parse(fs.readFileSync(providerDoc, 'utf8')));
+                    break;
+                default:
+                    console.log(`ERROR: unknown provider doc format ${providerDoc.split('.').pop()}`);
+                    return
+            };
             // write provider doc to output dir
+            const outputDir = options.outputDir;
+            const outputFile = `${outputDir}/provider.json`;
+            console.log("writing provider doc to %s...", outputFile);
+            fs.writeFileSync(outputFile, serializeData(providerDocJson, 'json'));
 
             // look for services dir
             // iterate through services dir

@@ -188,12 +188,12 @@ PowerShell:
 ```PowerShell
 cd local-registry
 provider-doc-util dev `
-.\ref\github\api.github.com.yaml `
+./ref/github/api.github.com.yaml `
 github `
 v1 `
 -s "$['x-github'].category" `
 -r "$['x-github'].subcategory" `
--o .\dev `
+-o ./dev `
 -f toml
 ```
 
@@ -220,10 +220,10 @@ PowerShell:
 cd local-registry
 provider-doc-util `
 build `
-.\dev `
+./dev `
 github `
 v1 `
--o .\src
+-o ./src
 ```
 
 Bash:  
