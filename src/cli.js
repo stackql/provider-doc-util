@@ -257,6 +257,12 @@ export async function cli(args) {
                 console.log(`Debug : ${debug}`);
             };
             try {
+                // clean dev dir
+                const devDir = `${outputDir}/${provider}`;
+                if (fs.existsSync(devDir)){
+                    console.log(`cleaning dev dir (${devDir})...`);
+                    fs.rmSync(devDir, { recursive: true });
+                };
                 let api = await OpenAPIParser.parse(apiDoc, {resolve: {http: false}});
                 const apiPaths = api.paths;
                 let svcMap = {}; // to hold open api spec paths by service
