@@ -378,14 +378,12 @@ export async function cli(args) {
                         resMap[service][resource]['methods'][operationId]['response']['mediaType'] = 'application/json';
                         
                         // get openAPIDocKey
-                        
                         responseCode = getResponseCode(apiPaths[pathKey][verbKey]['responses']);
                         resMap[service][resource]['methods'][operationId]['response']['openAPIDocKey'] = responseCode;
                         resMap[service][resource]['methods'][operationId]['response']['objectKey'] = 'items';
                         
                         // map sql verbs
                         sqlVerb = getSqlVerb(operationId);                       
-                        //swich case
                         switch (sqlVerb) {
                             case 'select':
                                 resMap[service][resource]['sqlVerbs']['select'].push({'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`});
