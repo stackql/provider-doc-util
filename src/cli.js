@@ -1,18 +1,33 @@
-import arg from 'arg';
+const arg = require('arg');
+const commandLineUsage = require('command-line-usage');
 const process = require('process');
 const OpenAPIParser = require("@readme/openapi-parser");
 const yaml = require('js-yaml');
 const fs = require('fs');
 const jp = require('jsonpath');
-var hcl = require("js-hcl-parser");
-var toml = require('@iarna/toml');
+const hcl = require("js-hcl-parser");
+const toml = require('@iarna/toml');
+import usage from './usage.js';
+
+function showUsage(operation) {
+    switch(operation) {
+        case 'dev':
+            console.log(commandLineUsage(usage.devUsage));
+            break;
+        case 'build':
+            console.log(commandLineUsage(usage.buildUsage));
+            break;
+        default:
+            console.log(commandLineUsage(usage.cmdUsage));
+    };
+}
 
 function parseArgumentsIntoOptions(rawArgs) {
  const args = arg(
    {
      '--svcdiscriminator': String,
      '--resdiscriminator': String,
-     '--methodKey': String,
+     '--methodkey': String,
      '--output': String,
      '--format': String,
      '--debug': Boolean,
@@ -41,34 +56,11 @@ function parseArgumentsIntoOptions(rawArgs) {
  };
 }
 
-function printUsage(operation) {
-    console.log("usage:");
-    console.log(" provider-doc-util");
-    switch(operation) {
-        case 'dev':
-            console.log("  dev");
-            console.log("  apiDoc");
-            console.log("  stackqlProviderName");
-            console.log("  stackqlProviderVersion");
-            console.log("  --svcDiscriminator | -s <JSONPath expression> OR <svcName:servicename>");
-            console.log("  --resDiscriminator | -r <JSONPath expression>");
-            console.log("  [--methodkey | -m <JSONPath expression>]");
-            console.log("  [--output | -o <outputdir>]");
-            console.log("  [--format | -f < yaml | json | toml | hcl >]");  
-            console.log("  [--debug | -d ]");       
-            break;
-        case 'build':
-            console.log("  build");
-            console.log("  providerDevDocRoot");
-            console.log("  stackqlProviderName");
-            console.log("  stackqlProviderVersion");
-            console.log("  [--output | -o <outputdir>]");
-            console.log("  [--debug | -d ]");       
-            break;
-        default:
-            console.log("  operation (dev or build)");
-      } 
-      
+function cleanDir(dir){
+    if (fs.existsSync(dir)){
+        console.log(`cleaning dir (${dir})...`);
+        fs.rmSync(dir, { recursive: true });
+    };
 }
 
 function serializeData(data, format){
@@ -106,12 +98,12 @@ export async function cli(args) {
     let options = parseArgumentsIntoOptions(args);
     let operation = "";
     if (!options.operation){
-        printUsage('unknown');
+        showUsage('unknown');
         return
     } else {
         operation = options.operation;
         if (operation != 'dev' && operation != 'build'){
-            printUsage('unknown');
+            showUsage('unknown');
             return            
         }
     };
@@ -121,7 +113,7 @@ export async function cli(args) {
     //
     if (operation == 'build'){
         if (!options.apiDocOrDir || !options.stackqlProviderName || !options.stackqlProviderVersion){
-            printUsage('build');
+            showUsage('build');
             return            
         } else {
             const providerDevDocRoot = options.apiDocOrDir;
@@ -131,10 +123,7 @@ export async function cli(args) {
             try {
                 // clean build dir
                 const buildDir = `${outputDir}/${providerName}/${providerVersion}`;
-                if (fs.existsSync(buildDir)){
-                    console.log(`cleaning build dir (${buildDir})...`);
-                    fs.rmSync(buildDir, { recursive: true });
-                };
+                cleanDir(buildDir);
                 const docDir = `${providerDevDocRoot}/${providerName}/${providerVersion}`;
                 console.log("looking for dev docs in %s...", docDir);
                 // check if dir exists
@@ -242,7 +231,7 @@ export async function cli(args) {
     //
     if (operation == 'dev'){
         if (!options.apiDocOrDir || !options.stackqlProviderName || !options.stackqlProviderVersion || !options.svcDiscriminator || !options.resDiscriminator){
-            printUsage(operation);
+            showUsage(operation);
             return
         } else {
             const apiDoc = options.apiDocOrDir;
@@ -266,12 +255,8 @@ export async function cli(args) {
                 console.log(`Debug : ${debug}`);
             };
             try {
-                // clean dev dir
                 const devDir = `${outputDir}/${provider}/${version}`;
-                if (fs.existsSync(devDir)){
-                    console.log(`cleaning dev dir (${devDir})...`);
-                    fs.rmSync(devDir, { recursive: true });
-                };
+                cleanDir(devDir);
                 let api = await OpenAPIParser.parse(apiDoc, {resolve: {http: false}});
                 const apiPaths = api.paths;
                 let svcMap = {}; // to hold open api spec paths by service
