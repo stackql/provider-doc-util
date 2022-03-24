@@ -91,6 +91,28 @@ function deserializeData(str, format){
       };
 }
 
+function getSqlVerb(operationId){
+    let verb = 'exec';
+    if (operationId.startsWith('get') || operationId.startsWith('list')){
+        verb = 'select';
+    } else if (operationId.startsWith('create')){
+        verb = 'insert';
+    } else if (operationId.startsWith('delete')){
+        verb = 'delete';
+    };
+    return verb;
+}
+
+function getResponseCode(responses){
+    let respcode = '200';    
+    Object.keys(responses).forEach(respKey => {
+        if (respKey.startsWith('2')){
+            respcode = respKey;
+        };
+    });
+    return respcode;
+}
+
 export async function cli(args) {
     //
     // parse command line args
@@ -278,27 +300,29 @@ export async function cli(args) {
                 let resMap = {}; // to hold stackql resources defs for each service
                 providerdef['providerServices'] = {};            
                 if (options.debug){
-                    console.log("API name: %s, Version: %s", api.info.title, api.info.version);
+                    console.log(`API name: ${api.info.title}, Version: ${api.info.version}`);
                 };
 
                 // iterate through openapi operations
                 Object.keys(apiPaths).forEach(pathKey => {
                     Object.keys(apiPaths[pathKey]).forEach(verbKey => {
-                        let operationId = apiPaths[pathKey][verbKey][methodKey].split("/")[1].replace(/-/g, "_"); 
-                        let service = "svc";
+                        let operationId = apiPaths[pathKey][verbKey][methodKey].split('/')[1].replace(/-/g, '_'); 
+                        let service = 'svc';
+                        let sqlVerb = false;
+                        let responseCode = 'default';
                         if (svcDiscriminator.startsWith('svcName:')){
-                            service = svcDiscriminator.split(":")[1];
+                            service = svcDiscriminator.split(':')[1];
                         } else {
                             service = jp.query(apiPaths[pathKey][verbKey], svcDiscriminator)[0];
                         };
                         let resValue = jp.query(apiPaths[pathKey][verbKey], resDiscriminator)[0];
                         let resource = resValue ? resValue : service;
                         if (options.debug){
-                            console.log("api %s:%s", pathKey, verbKey);
-                            console.log("stackqlService : %s", service);
-                            console.log("stackqlResource : %s", resource);
-                            console.log("stackqlMethod : %s", operationId);
-                            console.log("--------------------------");
+                            console.log(`api ${pathKey}:${verbKey}`);
+                            console.log(`stackqlService : ${service}`);
+                            console.log(`stackqlResource : ${resource}`);
+                            console.log(`stackqlMethod : ${operationId}`);
+                            console.log('--------------------------');
                         };
                         
                         if (!svcMap.hasOwnProperty(service)){
@@ -341,6 +365,7 @@ export async function cli(args) {
                             resMap[service][resource]['sqlVerbs'] = {};
                             resMap[service][resource]['sqlVerbs']['select'] = [];
                             resMap[service][resource]['sqlVerbs']['insert'] = [];
+                            resMap[service][resource]['sqlVerbs']['update'] = [];
                             resMap[service][resource]['sqlVerbs']['delete'] = [];
                         };
 
@@ -353,21 +378,28 @@ export async function cli(args) {
                         resMap[service][resource]['methods'][operationId]['response']['mediaType'] = 'application/json';
                         
                         // get openAPIDocKey
-                        let responseCode = 'default';
-                        Object.keys(apiPaths[pathKey][verbKey]['responses']).forEach(respKey => {
-                            if (respKey.startsWith('2')){
-                                responseCode = respKey;
-                            };
-                        });
+                        
+                        responseCode = getResponseCode(apiPaths[pathKey][verbKey]['responses']);
                         resMap[service][resource]['methods'][operationId]['response']['openAPIDocKey'] = responseCode;
                         resMap[service][resource]['methods'][operationId]['response']['objectKey'] = 'items';
                         
                         // map sql verbs
-                        if (operationId.startsWith('get') || operationId.startsWith('list')){
-                            resMap[service][resource]['sqlVerbs']['select'].push(
-                                {'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`}
-                            );
-                        };                    
+                        sqlVerb = getSqlVerb(operationId);                       
+                        //swich case
+                        switch (sqlVerb) {
+                            case 'select':
+                                resMap[service][resource]['sqlVerbs']['select'].push({'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`});
+                                break;
+                            case 'insert':
+                                resMap[service][resource]['sqlVerbs']['insert'].push({'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`});
+                                break;
+                            case 'delete':
+                                resMap[service][resource]['sqlVerbs']['delete'].push({'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`});
+                                break;
+                            default:
+                                break;
+                        };
+                   
                     });
                 });
         
