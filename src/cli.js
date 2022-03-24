@@ -175,14 +175,15 @@ export async function cli(args) {
                         return
                 };
 
-                // make package dirs
-                const servicesOutDir = `${buildDir}/${providerName}/${providerVersion}/services`; 
+                // make package dirs and create provider index doc
+                const outputFileType = 'yaml';
+                const servicesOutDir = `${buildDir}/services`; 
                 if (!fs.existsSync(servicesOutDir)){
                     fs.mkdirSync(servicesOutDir, { recursive: true });
                 }
-                const providerOutFile = `${buildDir}/${providerName}/${providerVersion}/provider.json`;
+                const providerOutFile = `${buildDir}/provider.${outputFileType}`;
                 console.log(`writing provider doc to ${providerOutFile}...`);
-                fs.writeFileSync(providerOutFile, serializeData(providerDocJson, 'json'));
+                fs.writeFileSync(providerOutFile, serializeData(providerDocJson, outputFileType));
                 
                 // look for services dir
                 const svcsInputDir = `${docDir}/services`;
@@ -224,10 +225,11 @@ export async function cli(args) {
                     });
                     outputObj['components']['x-stackQL-resources'] = resourcesDef['components']['x-stackQL-resources'];
                 
-                    // write service doc to output dir
-                    const outputFile = `${servicesOutDir}/${service}-${providerVersion}.json`;
+                    // create service dir and write service doc
+                    fs.mkdirSync(`${servicesOutDir}/${service}`);
+                    const outputFile = `${servicesOutDir}/${service}/${service}-${providerVersion}.${outputFileType}`;
                     console.log(`writing service doc to ${outputFile}...`);
-                    fs.writeFileSync(outputFile, serializeData(outputObj, 'json'));
+                    fs.writeFileSync(outputFile, serializeData(outputObj, outputFileType));
                 }
             } catch (err) {     
                 console.error(err);
@@ -298,7 +300,8 @@ export async function cli(args) {
                             console.log("stackqlMethod : %s", operationId);
                             console.log("--------------------------");
                         };
-                        if (Object.keys(svcMap).indexOf(service) === -1){
+                        
+                        if (!svcMap.hasOwnProperty(service)){
                             // fisrt occurance of the service, init service map
                             svcMap[service] = {};
                             svcMap[service]['paths'] = {};
@@ -308,7 +311,6 @@ export async function cli(args) {
                             
                             // init provider services
                             providerdef['providerServices'][service] = {};
-                            providerdef['providerServices'][service]['paths'] = {};
                             providerdef['providerServices'][service]['description'] = service;
                             providerdef['providerServices'][service]['id'] = `${service}:${providerVersion}`;
                             providerdef['providerServices'][service]['name'] = service;
@@ -320,12 +322,16 @@ export async function cli(args) {
                             providerdef['providerServices'][service]['title'] = service;
                             providerdef['providerServices'][service]['version'] = providerVersion;
                         };
-                        if (Object.keys(svcMap[service]).indexOf(pathKey) === -1){
-                            // first occurance of the path, init path map
+
+                        if (!svcMap[service]['paths'].hasOwnProperty(pathKey)){
                             svcMap[service]['paths'][pathKey] = {};
+                            svcMap[service]['paths'][pathKey][verbKey] = apiPaths[pathKey][verbKey];
+                        } else {
+                            svcMap[service]['paths'][pathKey][verbKey] = apiPaths[pathKey][verbKey];
                         };
-                        svcMap[service]['paths'][pathKey][verbKey] = apiPaths[pathKey][verbKey];
-                        if (Object.keys(resMap[service]).indexOf(resource) === -1){
+
+                        
+                        if (!resMap[service].hasOwnProperty(resource)){
                             // first occurance of the resource, init resource map
                             resMap[service][resource] = {};
                             resMap[service][resource]['id'] = `${providerName}.${service}.${resource}`;
@@ -337,6 +343,7 @@ export async function cli(args) {
                             resMap[service][resource]['sqlVerbs']['insert'] = [];
                             resMap[service][resource]['sqlVerbs']['delete'] = [];
                         };
+
                         resMap[service][resource]['methods'][operationId] = {};
                         resMap[service][resource]['methods'][operationId]['operation'] = {};
                         resMap[service][resource]['methods'][operationId]['operation']['$ref'] = verbKey.toUpperCase();
