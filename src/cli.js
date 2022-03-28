@@ -341,7 +341,7 @@ export async function cli(args) {
                             providerdef['providerServices'][service]['preferred'] = true;
                             providerdef['providerServices'][service]['service'] = 
                             {
-                                '$ref': `${providerName}/${providerVersion}/services/${service}/${service}-${providerVersion}.yaml`
+                               '$ref': `./services/${service}/${service}-${providerVersion}.yaml`
                             };
                             providerdef['providerServices'][service]['title'] = service;
                             providerdef['providerServices'][service]['version'] = providerVersion;
@@ -371,9 +371,9 @@ export async function cli(args) {
 
                         resMap[service][resource]['methods'][operationId] = {};
                         resMap[service][resource]['methods'][operationId]['operation'] = {};
-                        resMap[service][resource]['methods'][operationId]['operation']['$ref'] = verbKey.toUpperCase();
-                        resMap[service][resource]['methods'][operationId]['path'] = {};
-                        resMap[service][resource]['methods'][operationId]['path']['$ref'] = pathKey;
+                        resMap[service][resource]['methods'][operationId]['operation']['$ref'] = 
+                            `#/paths/${pathKey.replace(/\//g,'~1')}/${verbKey}`
+                        ;
                         resMap[service][resource]['methods'][operationId]['response'] = {};
                         resMap[service][resource]['methods'][operationId]['response']['mediaType'] = 'application/json';
                         
