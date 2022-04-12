@@ -208,7 +208,7 @@ v1 \
 -s '$["x-github"].category' \
 -r '$["x-github"].subcategory' \
 -o ./dev \
--f toml
+-f yaml
 ```
 
 ### Build Provider Docs
@@ -247,3 +247,5 @@ REG_STR='{"url": "file://'${PROVIDER_REGISTRY_ROOT_DIR}'", "localDocRoot": "'${P
 AUTH_STR='{"github": { "type": "null_auth" }}'
 ./stackql shell --auth="${AUTH_STR}" --registry="${REG_STR}"
 ```
+
+

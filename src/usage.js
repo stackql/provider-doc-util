@@ -125,7 +125,7 @@ const buildUsage = [
 ];
 
 export default {
-    cmdUsage,
-    buildUsage,
-    devUsage,
+  cmdUsage,
+  buildUsage,
+  devUsage,
 }

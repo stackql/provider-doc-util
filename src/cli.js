@@ -66,7 +66,7 @@ function cleanDir(dir){
 function serializeData(data, format){
     switch(format) {
         case 'yaml':
-            return yaml.dump(data);
+            return yaml.dump(data, {lineWidth: -1});
         case 'hcl':
             return hcl.stringify(JSON.stringify(data));
         case 'json':
@@ -221,7 +221,7 @@ export async function cli(args) {
                     console.log(`processing ${service}...`);
                 
                     // get openapi doc
-                    let openapiDocFile = `${svcsInputDir}/${service}/${service}-${providerVersion}.yaml`;
+                    let openapiDocFile = `${svcsInputDir}/${service}/${service}.yaml`;
                     if (!fs.existsSync(openapiDocFile)){
                         console.log(`ERROR: ${openapiDocFile} does not exist`);
                         return
@@ -247,9 +247,7 @@ export async function cli(args) {
                     });
                     outputObj['components']['x-stackQL-resources'] = resourcesDef['components']['x-stackQL-resources'];
                 
-                    // create service dir and write service doc
-                    fs.mkdirSync(`${servicesOutDir}/${service}`);
-                    const outputFile = `${servicesOutDir}/${service}/${service}-${providerVersion}.${outputFileType}`;
+                    const outputFile = `${servicesOutDir}/${service}.${outputFileType}`;
                     console.log(`writing service doc to ${outputFile}...`);
                     fs.writeFileSync(outputFile, serializeData(outputObj, outputFileType));
                 }
@@ -294,6 +292,12 @@ export async function cli(args) {
                 let api = await OpenAPIParser.parse(apiDoc, {resolve: {http: false}});
                 const apiPaths = api.paths;
 
+                // create tag map
+                const tagMap = {};
+                for (const tag of api.tags) {
+                    tagMap[tag.name] = tag.description;
+                };
+
                 // init output objects
                 let svcMap = {}; // to hold open api spec paths by service
                 let providerdef = {}; // to hold stackql entry point
@@ -315,8 +319,11 @@ export async function cli(args) {
                         } else {
                             service = jp.query(apiPaths[pathKey][verbKey], svcDiscriminator)[0];
                         };
+                        service = service.replace(/-/g, '_');
+
                         let resValue = jp.query(apiPaths[pathKey][verbKey], resDiscriminator)[0];
                         let resource = resValue ? resValue : service;
+                        resource = resource.replace(/-/g, '_');
                         if (options.debug){
                             console.log(`api ${pathKey}:${verbKey}`);
                             console.log(`stackqlService : ${service}`);
@@ -335,13 +342,13 @@ export async function cli(args) {
                             
                             // init provider services
                             providerdef['providerServices'][service] = {};
-                            providerdef['providerServices'][service]['description'] = service;
+                            providerdef['providerServices'][service]['description'] = tagMap[service];
                             providerdef['providerServices'][service]['id'] = `${service}:${providerVersion}`;
                             providerdef['providerServices'][service]['name'] = service;
                             providerdef['providerServices'][service]['preferred'] = true;
                             providerdef['providerServices'][service]['service'] = 
                             {
-                               '$ref': `./services/${service}/${service}-${providerVersion}.yaml`
+                               '$ref': `${providerName}/${providerVersion}/services/${service}.yaml`
                             };
                             providerdef['providerServices'][service]['title'] = service;
                             providerdef['providerServices'][service]['version'] = providerVersion;
@@ -353,7 +360,6 @@ export async function cli(args) {
                         } else {
                             svcMap[service]['paths'][pathKey][verbKey] = apiPaths[pathKey][verbKey];
                         };
-
                         
                         if (!resMap[service].hasOwnProperty(resource)){
                             // first occurance of the resource, init resource map
@@ -371,28 +377,40 @@ export async function cli(args) {
 
                         resMap[service][resource]['methods'][operationId] = {};
                         resMap[service][resource]['methods'][operationId]['operation'] = {};
-                        resMap[service][resource]['methods'][operationId]['operation']['$ref'] = 
-                            `#/paths/${pathKey.replace(/\//g,'~1')}/${verbKey}`
-                        ;
+
+                        resMap[service][resource]['methods'][operationId]['operation']['$ref'] = `${service}.yaml#/paths/${pathKey.replace(/\//g,'~1')}/${verbKey}`;
                         resMap[service][resource]['methods'][operationId]['response'] = {};
                         resMap[service][resource]['methods'][operationId]['response']['mediaType'] = 'application/json';
                         
                         // get openAPIDocKey
                         responseCode = getResponseCode(apiPaths[pathKey][verbKey]['responses']);
                         resMap[service][resource]['methods'][operationId]['response']['openAPIDocKey'] = responseCode;
-                        resMap[service][resource]['methods'][operationId]['response']['objectKey'] = 'items';
+                        //resMap[service][resource]['methods'][operationId]['response']['objectKey'] = 'items';
                         
                         // map sql verbs
+                        // TODO order sql verbs
                         sqlVerb = getSqlVerb(operationId);                       
                         switch (sqlVerb) {
                             case 'select':
-                                resMap[service][resource]['sqlVerbs']['select'].push({'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`});
+                                resMap[service][resource]['sqlVerbs']['select'].push(
+                                    {
+                                        '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
+                                        'path': pathKey
+                                    });
                                 break;
                             case 'insert':
-                                resMap[service][resource]['sqlVerbs']['insert'].push({'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`});
+                                resMap[service][resource]['sqlVerbs']['insert'].push(
+                                    {
+                                        '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
+                                        'path': pathKey
+                                    });
                                 break;
                             case 'delete':
-                                resMap[service][resource]['sqlVerbs']['delete'].push({'$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`});
+                                resMap[service][resource]['sqlVerbs']['delete'].push(
+                                    {
+                                        '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
+                                        'path': pathKey
+                                    });
                                 break;
                             default:
                                 break;
@@ -433,8 +451,8 @@ export async function cli(args) {
                     svcMap[svcKey]['servers'] = api.servers;
                     svcMap[svcKey]['externalDocs'] = api.externalDocs;
                     svcMap[svcKey]['components'] = api.components;
-                    console.log(`writing ${svcDir}/${svcKey}-${providerVersion}.yaml`);
-                    fs.writeFileSync(`${svcDir}/${svcKey}-${providerVersion}.yaml`, serializeData(svcMap[svcKey], 'yaml'), (err) => {
+                    console.log(`writing ${svcDir}/${svcKey}.yaml`);
+                    fs.writeFileSync(`${svcDir}/${svcKey}.yaml`, serializeData(svcMap[svcKey], 'yaml'), (err) => {
                         if (err) {
                             console.log(err);
                         }
@@ -444,11 +462,11 @@ export async function cli(args) {
                 // write out stackql resources docs
                 Object.keys(resMap).forEach(svcKey => {
                     svcDir = `${rootDir}/services/${svcKey}`;
-                    console.log(`writing ${svcDir}/${svcKey}-${providerVersion}-resources.${outputFormat}`);
+                    console.log(`writing ${svcDir}/${svcKey}-resources.${outputFormat}`);
                     let resourcesDoc = {};
                     resourcesDoc['components'] = {};
                     resourcesDoc['components']['x-stackQL-resources'] = resMap[svcKey];
-                    fs.writeFileSync(`${svcDir}/${svcKey}-${providerVersion}-resources.${outputFormat}`, serializeData(resourcesDoc, outputFormat), (err) => {
+                    fs.writeFileSync(`${svcDir}/${svcKey}-resources.${outputFormat}`, serializeData(resourcesDoc, outputFormat), (err) => {
                         if (err) {
                             console.log(err);
                         }
