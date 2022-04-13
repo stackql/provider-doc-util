@@ -407,21 +407,24 @@ export async function cli(args) {
                                 resMap[service][resource]['sqlVerbs']['select'].push(
                                     {
                                         '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
-                                        'path': pathKey
+                                        'path': pathKey,
+                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(',')
                                     });
                                 break;
                             case 'insert':
                                 resMap[service][resource]['sqlVerbs']['insert'].push(
                                     {
                                         '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
-                                        'path': pathKey
+                                        'path': pathKey,
+                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(',')                                        
                                     });
                                 break;
                             case 'delete':
                                 resMap[service][resource]['sqlVerbs']['delete'].push(
                                     {
                                         '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
-                                        'path': pathKey
+                                        'path': pathKey,
+                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(',')                                        
                                     });
                                 break;
                             default:
