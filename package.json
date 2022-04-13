@@ -1,6 +1,6 @@
 {
   "name": "@stackql/provider-doc-util",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Command line utility to prepare StackQL provider interface documents",
   "main": "src/index.js",
   "bin": {

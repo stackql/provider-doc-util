@@ -113,6 +113,19 @@ function getResponseCode(responses){
     return respcode;
 }
 
+function compareSqlVerbObjects( a, b ) {
+    let aCount = (a.path.match(/\{[\w]*\}/g) || []).length;
+    let bCount = (b.path.match(/\{[\w]*\}/g) || []).length;
+    if (aCount > bCount) {
+        return -1;
+    }
+    if (aCount > bCount) {
+        return 1;
+    }
+    return 0;
+}
+
+
 export async function cli(args) {
     //
     // parse command line args
@@ -388,7 +401,6 @@ export async function cli(args) {
                         //resMap[service][resource]['methods'][operationId]['response']['objectKey'] = 'items';
                         
                         // map sql verbs
-                        // TODO order sql verbs
                         sqlVerb = getSqlVerb(operationId);                       
                         switch (sqlVerb) {
                             case 'select':
@@ -458,9 +470,16 @@ export async function cli(args) {
                         }
                     });
                 });
-        
+
                 // write out stackql resources docs
                 Object.keys(resMap).forEach(svcKey => {
+                    // reorder sqlverbs from most specific to least specific
+                    Object.keys(resMap[svcKey]).forEach(resKey => {
+                        resMap[svcKey][resKey]['sqlVerbs']['select'].sort( compareSqlVerbObjects );
+                        resMap[svcKey][resKey]['sqlVerbs']['insert'].sort( compareSqlVerbObjects );
+                        resMap[svcKey][resKey]['sqlVerbs']['update'].sort( compareSqlVerbObjects );
+                        resMap[svcKey][resKey]['sqlVerbs']['delete'].sort( compareSqlVerbObjects );
+                    });
                     svcDir = `${rootDir}/services/${svcKey}`;
                     console.log(`writing ${svcDir}/${svcKey}-resources.${outputFormat}`);
                     let resourcesDoc = {};
