@@ -7,6 +7,7 @@ const fs = require('fs');
 const jp = require('jsonpath');
 const hcl = require("js-hcl-parser");
 const toml = require('@iarna/toml');
+const chalk = require('chalk');
 import usage from './usage.js';
 
 function showUsage(operation) {
@@ -93,11 +94,11 @@ function deserializeData(str, format){
 
 function getSqlVerb(operationId){
     let verb = 'exec';
-    if (operationId.startsWith('get') || operationId.startsWith('list')){
+    if (operationId.startsWith('get') || operationId.startsWith('list') || operationId.startsWith('select')){
         verb = 'select';
-    } else if (operationId.startsWith('create')){
+    } else if (operationId.startsWith('create') || operationId.startsWith('insert') || operationId.startsWith('add')){
         verb = 'insert';
-    } else if (operationId.startsWith('delete')){
+    } else if (operationId.startsWith('delete') || operationId.startsWith('remove')){
         verb = 'delete';
     };
     return verb;
@@ -125,6 +126,44 @@ function compareSqlVerbObjects( a, b ) {
     return 0;
 }
 
+function retServiceName( providerName, operation, pathKey, discriminator ) {
+    if (discriminator.startsWith('svcName:')){
+        return discriminator.split(':')[1];
+    } else {
+        let thisSvc = jp.query(operation, discriminator)[0];
+        thisSvc = thisSvc.replace(/-/g, '_');
+        if (providerName === 'github'){
+            if (thisSvc === 'enterprise_admin'){
+                return thisSvc;
+            } else {
+                switch(pathKey.split('/')[1]) {
+                    case 'repositories':
+                        if(thisSvc === 'repos'){
+                            return `repos`;
+                        } else {
+                            return `${thisSvc}_repos`;
+                        }
+                    case 'repos':
+                        if(thisSvc === 'repos'){
+                            return `repos`;
+                        } else {
+                            return `${thisSvc}_repos`;
+                        }
+                    case 'enterprises':
+                        return `${thisSvc}_enterprises`;
+                    case 'orgs':
+                        if(thisSvc === 'orgs'){
+                            return `orgs`;
+                        } else {
+                            return `${thisSvc}_orgs`;
+                        }
+                    default:
+                        return thisSvc;
+                  };
+            }
+        }
+    };
+}
 
 export async function cli(args) {
     //
@@ -258,8 +297,34 @@ export async function cli(args) {
                     Object.keys(openapiData).forEach(openapiKey => {
                         outputObj[openapiKey] = openapiData[openapiKey];
                     });
-                    outputObj['components']['x-stackQL-resources'] = resourcesDef['components']['x-stackQL-resources'];
-                
+
+                    // iterate through resources remove dev keys
+                    let xStackQLResources = resourcesDef['components']['x-stackQL-resources'];
+                    Object.keys(xStackQLResources).forEach(xStackQLResKey => {
+                        let newSqlVerbs = {};
+                        Object.keys(xStackQLResources[xStackQLResKey]['sqlVerbs']).forEach(sqlVerb => {
+                            let newSqlVerb = [];
+                            let tokens = [];
+                            xStackQLResources[xStackQLResKey]['sqlVerbs'][sqlVerb].forEach(sqlVerbObj => {
+                                if (sqlVerbObj['enabled'] === true){
+                                    tokens.push(sqlVerbObj['tokens']);
+                                    var thisRef = {};
+                                    thisRef['$ref'] = sqlVerbObj['$ref'];
+                                    newSqlVerb.push(thisRef);
+                                };
+                            });
+                            // check if tokens are unique
+                            if (tokens.length !== new Set(tokens).size){
+                                console.log(chalk.red(`ERROR: unreachable routes in ${service}/${xStackQLResKey}`));
+                                return
+                            };
+                            newSqlVerbs[sqlVerb] = newSqlVerb;
+                        });
+                        xStackQLResources[xStackQLResKey]['sqlVerbs'] = newSqlVerbs;
+                    });      
+
+                    outputObj['components']['x-stackQL-resources'] = xStackQLResources
+
                     const outputFile = `${servicesOutDir}/${service}.${outputFileType}`;
                     console.log(`writing service doc to ${outputFile}...`);
                     fs.writeFileSync(outputFile, serializeData(outputObj, outputFileType));
@@ -327,16 +392,13 @@ export async function cli(args) {
                         let service = 'svc';
                         let sqlVerb = false;
                         let responseCode = 'default';
-                        if (svcDiscriminator.startsWith('svcName:')){
-                            service = svcDiscriminator.split(':')[1];
-                        } else {
-                            service = jp.query(apiPaths[pathKey][verbKey], svcDiscriminator)[0];
-                        };
-                        service = service.replace(/-/g, '_');
-
+                        
+                        service = retServiceName(providerName, apiPaths[pathKey][verbKey], pathKey, svcDiscriminator);
+                        
                         let resValue = jp.query(apiPaths[pathKey][verbKey], resDiscriminator)[0];
                         let resource = resValue ? resValue : service;
                         resource = resource.replace(/-/g, '_');
+                        
                         if (options.debug){
                             console.log(`api ${pathKey}:${verbKey}`);
                             console.log(`stackqlService : ${service}`);
@@ -408,7 +470,8 @@ export async function cli(args) {
                                     {
                                         '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
                                         'path': pathKey,
-                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(',')
+                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(','),
+                                        'enabled': true
                                     });
                                 break;
                             case 'insert':
@@ -416,7 +479,8 @@ export async function cli(args) {
                                     {
                                         '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
                                         'path': pathKey,
-                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(',')                                        
+                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(','),
+                                        'enabled': true                                        
                                     });
                                 break;
                             case 'delete':
@@ -424,7 +488,8 @@ export async function cli(args) {
                                     {
                                         '$ref': `#/components/x-stackQL-resources/${resource}/methods/${operationId}`,
                                         'path': pathKey,
-                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(',')                                        
+                                        'tokens': (pathKey.match(/\{[\w]*\}/g) || []).join(','),
+                                        'enabled': true
                                     });
                                 break;
                             default:
